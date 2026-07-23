@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Search</title>
+<script>
+// (B) Frontend validation — OWASP C3 Validate All Inputs
+function validateSearch() {
+    var term = document.getElementById('search').value.trim();
+    var pattern = /^[a-zA-Z0-9 _.\-]{1,100}$/;
+    if (term.length < 1 || !pattern.test(term)) {
+        alert('Invalid search term. Use only letters, digits, spaces, hyphens, underscores, periods (max 100 chars).');
+        document.getElementById('search').value = '';
+        return false;   // (G) stay on home, input cleared
+    }
+    return true;        // (H) allow form submission
+}
+</script>
+</head>
+<body>
+    <h1>Search</h1>
+    <form action="/search" method="post" onsubmit="return validateSearch()">
+        <label for="search">Search term:</label>
+        <input type="text" id="search" name="search" maxlength="100" required>
+        <button type="submit">Submit</button>
+    </form>
+    <p id="msg"></p>
+    <script>
+    // Show error message if redirected back due to invalid input
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('error') === '1') {
+        document.getElementById('msg').textContent = 'Invalid input. Please try again.';
+    }
+    </script>
+</body>
+</html>
