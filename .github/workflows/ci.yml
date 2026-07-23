@@ -90,9 +90,9 @@ jobs:
           nohup node app.js > app.log 2>&1 &
           echo "Waiting for app to start..."
           for i in {1..15}; do
-            curl -sf http://localhost:3000 > /dev/null 2>&1 && echo "App is up!" && break || sleep 2
+            curl -sf -u "admin:$ADMIN_PASSWORD" http://localhost:3000 > /dev/null 2>&1 && echo "App is up!" && break || sleep 2
           done
-          curl -f http://localhost:3000 || { echo "App failed to start"; cat app.log; exit 1; }
+          curl -f -u "admin:$ADMIN_PASSWORD" http://localhost:3000 || { echo "App failed to start"; cat app.log; exit 1; }
         env:
           HTTP_ONLY: "true"
           ADMIN_PASSWORD: "2401154@SIT.singaporetech.edu.sg"
