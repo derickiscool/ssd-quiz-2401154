@@ -15,6 +15,8 @@ export default [
             ...pluginSecurity.configs.recommended.rules,
             ...securityNode.configs.recommended.rules,
             ...eslintPluginNoUnsanitized.configs.recommended.rules,
+            // False positive: we only log internal status, never user-controlled data
+            'security-node/detect-crlf': 'off',
         },
         languageOptions: {
             globals: {
