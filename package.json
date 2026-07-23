@@ -17,6 +17,9 @@
     "mocha": "^10.7.0",
     "selenium-webdriver": "^4.45.0"
   },
+  "overrides": {
+    "serialize-javascript": "7.0.7"
+  },
   "scripts": {
     "test": "mocha tests/*.test.js"
   }
