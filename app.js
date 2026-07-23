@@ -6,7 +6,10 @@ const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
 
 const app = express();
-const PORT = 443;
+const PORT = process.env.HTTP_ONLY
+    ? parseInt(process.env.HTTP_PORT || '3000')
+    : 443;
+const HTTP_PORT = 80;
 
 // ---------- Auth (same credentials as nginx) ----------
 app.use(basicAuth({
@@ -124,22 +127,40 @@ app.post('/search', async (req, res) => {
     res.send(renderResult(term, queryTime));
 });
 
-// ---------- HTTP → HTTPS redirect ----------
-const http = require('http');
-http.createServer((req, res) => {
-    const host = req.headers.host ? req.headers.host.replace(/:\d+$/, '') : 'localhost';
-    res.writeHead(301, { Location: `https://${host}:${PORT}${req.url}` });
-    res.end();
-}).listen(80, () => console.log('HTTP redirector on :80 → :443'));
+// ---------- Start server (only when run directly, not when imported for tests) ----------
+if (require.main === module) {
+    if (process.env.HTTP_ONLY) {
+        // CI/testing mode: listen on HTTP only (no certs needed)
+        initDb().then(() => {
+            app.listen(PORT, () => {
+                console.log(`App running in HTTP-only mode on port ${PORT}`);
+            });
+        }).catch(err => {
+            console.error('DB init failed, starting without DB:', err.message);
+            app.listen(PORT, () => {
+                console.log(`App running in HTTP-only mode on port ${PORT} (no DB)`);
+            });
+        });
+    } else {
+        // Normal mode: HTTP → HTTPS redirect + HTTPS server
+        const http = require('http');
+        http.createServer((req, res) => {
+            const host = req.headers.host ? req.headers.host.replace(/:\d+$/, '') : 'localhost';
+            res.writeHead(301, { Location: `https://${host}${req.url}` });
+            res.end();
+        }).listen(HTTP_PORT, () => console.log('HTTP redirector on :80 → :443'));
 
-// ---------- HTTPS server ----------
-const sslOptions = {
-    key: fs.readFileSync('/app/ssl/key.pem'),
-    cert: fs.readFileSync('/app/ssl/cert.pem')
-};
+        const sslOptions = {
+            key: fs.readFileSync('/app/ssl/key.pem'),
+            cert: fs.readFileSync('/app/ssl/cert.pem')
+        };
 
-initDb().then(() => {
-    https.createServer(sslOptions, app).listen(PORT, () => {
-        console.log(`App running on https://localhost:${PORT}`);
-    });
-});
+        initDb().then(() => {
+            https.createServer(sslOptions, app).listen(PORT, () => {
+                console.log(`App running on https://localhost:${PORT}`);
+            });
+        });
+    }
+}
+
+module.exports = { validateSearchTerm };

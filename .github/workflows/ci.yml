@@ -1,0 +1,120 @@
+name: CI — Integration · Dependency Check · UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Job 1: Build & Dependency Check
+  # ──────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: ssd-quiz
+          path: .
+          format: HTML
+          out: dependency-check-report
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+      - name: Upload Dependency Check Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
+
+  # ──────────────────────────────────────────────
+  # Job 2: Integration & UI Tests
+  # ──────────────────────────────────────────────
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: searchdb
+          MYSQL_USER: app
+          MYSQL_PASSWORD: pass
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -u app -ppass"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+
+      selenium:
+        image: selenium/standalone-chrome
+        ports:
+          - 4444:4444
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Integration tests (unit) ──
+      - name: Run integration tests
+        run: npm test
+
+      # ── Start app in HTTP-only mode ──
+      - name: Start application
+        run: |
+          nohup node app.js > app.log 2>&1 &
+          echo "Waiting for app to start..."
+          for i in {1..15}; do
+            curl -sf http://localhost:3000 > /dev/null 2>&1 && echo "App is up!" && break || sleep 2
+          done
+          curl -f http://localhost:3000 || { echo "App failed to start"; cat app.log; exit 1; }
+        env:
+          HTTP_ONLY: "true"
+          ADMIN_PASSWORD: "2401154@SIT.singaporetech.edu.sg"
+          DB_HOST: localhost
+          DB_USER: app
+          DB_PASSWORD: pass
+          DB_NAME: searchdb
+
+      # ── Wait for Selenium ──
+      - name: Wait for Selenium
+        run: |
+          for i in {1..15}; do
+            curl -sf http://localhost:4444/wd/hub/status > /dev/null 2>&1 && echo "Selenium is up!" && break || sleep 3
+          done
+
+      # ── UI tests (Selenium) ──
+      - name: Run UI tests
+        run: node tests/ui-test.mjs github
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          SELENIUM_HOST: http://localhost:4444/wd/hub
+
+      - name: Dump app logs on failure
+        if: failure()
+        run: cat app.log
