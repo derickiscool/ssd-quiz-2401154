@@ -1,8 +1,10 @@
 FROM node:alpine
+RUN adduser -D -g app app
 WORKDIR /app
 COPY package.json ./
-RUN npm install --production
+RUN npm install --production && chown -R app:app /app
 COPY app.js ./
 COPY public ./public
-EXPOSE 443
+USER app
+EXPOSE 3000
 CMD ["node", "app.js"]

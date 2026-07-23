@@ -6,9 +6,7 @@ const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
 
 const app = express();
-const PORT = process.env.HTTP_ONLY
-    ? parseInt(process.env.HTTP_PORT || '3000')
-    : 443;
+const PORT = parseInt(process.env.HTTP_PORT || '3000');
 const HTTP_PORT = 80;
 
 // ---------- Auth (same credentials as nginx) ----------

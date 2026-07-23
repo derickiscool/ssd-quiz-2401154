@@ -6,7 +6,7 @@ services:
     container_name: app
     ports:
       - "80:80"
-      - "443:443"
+      - "443:3000"
     volumes:
       - ./ssl:/app/ssl:ro
     environment:
