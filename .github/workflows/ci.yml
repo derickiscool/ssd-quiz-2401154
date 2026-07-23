@@ -48,6 +48,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
+    # Run inside a node:22 container on the same Docker network as services.
+    # Selenium reaches the app via --network-alias, not localhost.
+    container:
+      image: node:22
+      options: --network-alias=appserver
+
     services:
       mysql:
         image: mysql:8.0
@@ -64,18 +70,10 @@ jobs:
 
       selenium:
         image: selenium/standalone-chrome
-        ports:
-          - 4444:4444
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -90,13 +88,13 @@ jobs:
           nohup node app.js > app.log 2>&1 &
           echo "Waiting for app to start..."
           for i in {1..15}; do
-            curl -sf -u "admin:$ADMIN_PASSWORD" http://localhost:3000 > /dev/null 2>&1 && echo "App is up!" && break || sleep 2
+            curl -sf -u "admin:$ADMIN_PASSWORD" http://appserver:3000 > /dev/null 2>&1 && echo "App is up!" && break || sleep 2
           done
-          curl -f -u "admin:$ADMIN_PASSWORD" http://localhost:3000 || { echo "App failed to start"; cat app.log; exit 1; }
+          curl -f -u "admin:$ADMIN_PASSWORD" http://appserver:3000 || { echo "App failed to start"; cat app.log; exit 1; }
         env:
           HTTP_ONLY: "true"
           ADMIN_PASSWORD: "2401154@SIT.singaporetech.edu.sg"
-          DB_HOST: localhost
+          DB_HOST: mysql
           DB_USER: app
           DB_PASSWORD: pass
           DB_NAME: searchdb
@@ -105,15 +103,15 @@ jobs:
       - name: Wait for Selenium
         run: |
           for i in {1..15}; do
-            curl -sf http://localhost:4444/wd/hub/status > /dev/null 2>&1 && echo "Selenium is up!" && break || sleep 3
+            curl -sf http://selenium:4444/wd/hub/status > /dev/null 2>&1 && echo "Selenium is up!" && break || sleep 3
           done
 
       # ── UI tests (Selenium) ──
       - name: Run UI tests
         run: node tests/ui-test.mjs github
         env:
-          TEST_BASE_URL: http://localhost:3000
-          SELENIUM_HOST: http://localhost:4444/wd/hub
+          TEST_BASE_URL: http://appserver:3000
+          SELENIUM_HOST: http://selenium:4444/wd/hub
 
       - name: Dump app logs on failure
         if: failure()

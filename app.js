@@ -91,6 +91,9 @@ async function logSearch(term) {
         });
         const [result] = await conn.execute('INSERT INTO `2401154` (query) VALUES (?)', [term]);
         return result.insertId;
+    } catch (err) {
+        console.error('DB log error:', err.message);
+        return null;  // graceful fallback — don't crash the request
     } finally {
         if (conn) await conn.end();
     }
