@@ -8,10 +8,13 @@ on:
 
 jobs:
   # ──────────────────────────────────────────────
-  # Job 1: Build & Dependency Check
+  # Job 1: Build, Dependency Check & ESLint
   # ──────────────────────────────────────────────
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write      # needed for SARIF upload
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,6 +28,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ── OWASP Dependency Check (SCA) ──
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
@@ -40,6 +44,18 @@ jobs:
         with:
           name: dependency-check-report
           path: dependency-check-report
+
+      # ── ESLint Security Analysis (SAST) ──
+      - name: Create reports directory
+        run: mkdir -p reports
+
+      - name: Run ESLint with SARIF output
+        run: npx eslint . --format @microsoft/eslint-formatter-sarif --output-file reports/eslint-results.sarif || true
+
+      - name: Upload ESLint SARIF report
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: reports/eslint-results.sarif
 
   # ──────────────────────────────────────────────
   # Job 2: Integration & UI Tests
