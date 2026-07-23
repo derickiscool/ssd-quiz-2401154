@@ -12,3 +12,14 @@ services:
       - ./ssl/key.pem:/etc/nginx/ssl/key.pem:ro
       - ./www:/usr/share/nginx/html:ro
     restart: unless-stopped
+
+  git-server:
+    build:
+      dockerfile: gitserver.Dockerfile
+      context: .
+    container_name: git-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./repos:/var/www/git
