@@ -6,8 +6,8 @@ const mysql = require('mysql2/promise');
 const basicAuth = require('express-basic-auth');
 
 const app = express();
-const PORT = parseInt(process.env.HTTP_PORT || '3000');
-const HTTP_PORT = 80;
+const PORT = Number.parseInt(process.env.HTTP_PORT || '3000');
+const HTTP_PORT = Number.parseInt(process.env.HTTP_REDIRECT_PORT || '8080');
 
 // ---------- Auth (same credentials as nginx) ----------
 app.use(basicAuth({
@@ -149,7 +149,7 @@ if (require.main === module) {
             const host = req.headers.host ? req.headers.host.replace(/:\d+$/, '') : 'localhost';
             res.writeHead(301, { Location: `https://${host}${req.url}` });
             res.end();
-        }).listen(HTTP_PORT, () => console.log('HTTP redirector on :80 → :443'));
+        }).listen(HTTP_PORT, () => console.log(`HTTP redirector on :${HTTP_PORT} → https://host`));
 
         const sslOptions = {
             key: fs.readFileSync('/app/ssl/key.pem'),
