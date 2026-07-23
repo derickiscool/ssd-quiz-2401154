@@ -31,14 +31,16 @@ function validateSearchTerm(term) {
 }
 
 // ---------- HTML helpers ----------
-function renderResult(term) {
+function renderResult(term, queryTime) {
     const safe = sanitize(term);
+    const time = queryTime || new Date().toISOString();
     return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><title>Search Result</title></head>
 <body>
     <h1>Search Result</h1>
     <p>You searched for: <strong>${safe}</strong></p>
+    <p>Logged at: ${time}</p>
     <a href="/"><button>Return to Home</button></a>
 </body>
 </html>`;
@@ -84,7 +86,8 @@ async function logSearch(term) {
             password: process.env.DB_PASSWORD || 'pass',
             database: process.env.DB_NAME || 'searchdb'
         });
-        await conn.execute('INSERT INTO `2401154` (query) VALUES (?)', [term]);
+        const [result] = await conn.execute('INSERT INTO `2401154` (query) VALUES (?)', [term]);
+        return result.insertId;
     } finally {
         if (conn) await conn.end();
     }
@@ -101,10 +104,24 @@ app.post('/search', async (req, res) => {
     }
 
     // (H) Valid — log to DB (I)
-    await logSearch(term);
+    const insertId = await logSearch(term);
 
-    // Show result page
-    res.send(renderResult(term));
+    // Fetch timestamp for display
+    let queryTime = '';
+    try {
+        const conn = await mysql.createConnection({
+            host: process.env.DB_HOST || 'db',
+            user: process.env.DB_USER || 'app',
+            password: process.env.DB_PASSWORD || 'pass',
+            database: process.env.DB_NAME || 'searchdb'
+        });
+        const [rows] = await conn.execute('SELECT query_time FROM `2401154` WHERE id = ?', [insertId]);
+        if (rows.length > 0) queryTime = rows[0].query_time;
+        await conn.end();
+    } catch (_) { /* fallback to current time */ }
+
+    // Show result page with timestamp
+    res.send(renderResult(term, queryTime));
 });
 
 // ---------- HTTP → HTTPS redirect ----------
